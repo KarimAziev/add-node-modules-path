@@ -1,4 +1,4 @@
-;;; add-node-modules-path.el --- Add node_modules to your exec-path
+;;; add-node-modules-path.el --- Add node_modules to your exec-path -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2016 Neri Marschik
 ;; This package uses the MIT License.
@@ -6,8 +6,8 @@
 
 ;; Author: Neri Marschik <marschik_neri@cyberagent.co.jp>
 ;; Version: 1.0
-;; Package-Requires: ((s "1.12.0"))
-;; Keywords: javascript, node, node_modules, eslint
+;; Package-Requires: ((emacs "24.1"))
+;; Keywords: languages
 ;; URL: https://github.com/codesuki/add-node-modules-path
 
 ;;; Commentary:
@@ -30,17 +30,10 @@
 
 ;;; Code:
 
-(require 's)
-
 (defgroup add-node-modules-path nil
-  "Put node_modules binaries into `exec-path'."
+  "Put node_modules binaries into the variable `exec-path'."
   :prefix "add-node-modules-path-"
   :group 'environment)
-
-;;;###autoload
-(defcustom add-node-modules-path-command "npm bin"
-  "Command to find the bin path."
-  :type 'string)
 
 ;;;###autoload
 (defcustom add-node-modules-path-debug nil
@@ -48,29 +41,39 @@
   :type 'boolean
   :group 'add-node-modules-path)
 
+
+(defun add-node-modules-path-debug-message (&rest args)
+  "Show message with ARGS if `add-node-modules-path-debug' is non nil.
+Return nil."
+  (when add-node-modules-path-debug
+    (apply #'message args)
+    nil))
+
+(defun add-node-modules-path-find-node-modules ()
+  "Return absolute path to node_modules/.bin in directory hierarchy or nil."
+  (let* ((project-dir (or (locate-dominating-file default-directory
+                                                  "node_modules")))
+         (directory (when project-dir
+                      (concat project-dir "node_modules/.bin"))))
+    (when (and directory
+               (file-exists-p directory))
+      (expand-file-name directory))))
+
 ;;;###autoload
 (defun add-node-modules-path ()
   "Run `npm bin` command and add the path to the `exec-path`.
 If `npm` command fails, it does nothing."
   (interactive)
-
-  (let* ((res (s-chomp (shell-command-to-string add-node-modules-path-command)))
-         (exists (file-exists-p res))
-         )
-    (cond
-     (exists
+  (let ((res (add-node-modules-path-find-node-modules)))
+    (if (not res)
+        (add-node-modules-path-debug-message
+         "add-node-modules-path: node_modules/.bin not found in %s"
+         default-directory)
       (make-local-variable 'exec-path)
       (add-to-list 'exec-path res)
-      (when add-node-modules-path-debug
-        (message "Added to `exec-path`: %s" res))
-      )
-     (t
-      (when add-node-modules-path-debug
-        (message "Failed to run `%s':\n %s" add-node-modules-path-command res))
-      ))
-    )
-  )
+      (add-node-modules-path-debug-message
+       "add-node-modules-path: added `%s' to the variable `exec-path'" res))))
+
 
 (provide 'add-node-modules-path)
-
 ;;; add-node-modules-path.el ends here
